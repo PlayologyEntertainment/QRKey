@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QRKey Studio</title>
+
+  <!-- React + ReactDOM UMD -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+  <!-- Babel Standalone for JSX transpilation -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Framer Motion UMD -->
+  <script src="https://unpkg.com/framer-motion@11/dist/framer-motion.js"></script>
+
+  <!-- QR Code Styling -->
+  <script src="https://cdn.jsdelivr.net/npm/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Playfair+Display:wght@400;700;900&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; }
+    body { background: #0c0c0c; }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: #0c0c0c; }
+    ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+
+    .qr-preview-wrapper canvas { border-radius: 12px; display: block; }
+
+    .dot-btn { transition: all 0.15s ease; }
+    .dot-btn:hover { transform: scale(1.05); }
+    .dot-btn.active { box-shadow: 0 0 0 2px #d4a853; }
+
+    .control-section { border-bottom: 1px solid #1e1e1e; }
+
+    input[type="color"] {
+      -webkit-appearance: none;
+      border: none;
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      cursor: pointer;
+      padding: 2px;
+      background: transparent;
+    }
+    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; border-radius: 6px; }
+    input[type="color"]::-webkit-color-swatch { border: none; border-radius: 6px; }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%; height: 3px;
+      background: #2a2a2a;
+      border-radius: 2px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: #d4a853;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+    .tab-pill { transition: all 0.2s ease; cursor: pointer; border: none; background: transparent; }
+    .tab-pill.active { background: #d4a853; color: #0c0c0c; }
+
+    .input-field {
+      background: #111;
+      border: 1px solid #222;
+      color: #e8e4dc;
+      border-radius: 8px;
+      padding: 10px 14px;
+      width: 100%;
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .input-field:focus { border-color: #d4a853; }
+    .input-field::placeholder { color: #444; }
+
+    .toggle-switch {
+      position: relative;
+      width: 40px; height: 22px;
+      background: #222;
+      border-radius: 11px;
+      cursor: pointer;
+      transition: background 0.2s;
+      flex-shrink: 0;
+    }
+    .toggle-switch.on { background: #d4a853; }
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 16px; height: 16px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .toggle-switch.on::after { transform: translateX(18px); }
+
+    .download-btn {
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      background: transparent;
+    }
+    .download-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(212,168,83,0.1);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.3s ease;
+    }
+    .download-btn:hover::before { transform: scaleX(1); }
+    .download-btn:hover { border-color: #d4a853 !important; color: #d4a853 !important; }
+    .download-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    @keyframes qrPulse { 0%,100%{opacity:1} 50%{opacity:0.7} }
+    .qr-loading { animation: qrPulse 1.2s ease infinite; }
+
+    @keyframes fadeDown { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
+    .notification-anim { animation: fadeDown 0.3s ease; }
+
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+    .fade-in { animation: fadeIn 0.5s ease forwards; }
+
+    .left-panel { animation: fadeIn 0.6s 0.1s ease both; }
+    .right-panel { animation: fadeIn 0.6s 0.2s ease both; }
+
+    .contrast-warn {
+      display: flex; align-items: center; gap: 8px;
+      background: #2a1a0a; border: 1px solid #5a3a1a;
+      border-radius: 8px; padding: 8px 12px;
+    }
+    .contrast-ok { font-size: 10px; color: #2a7a4b; }
+
+    .logo-drop-zone {
+      border: 2px dashed #1e1e1e;
+      border-radius: 12px; padding: 24px;
+      text-align: center; cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .logo-drop-zone:hover { border-color: #2a2a2a; }
+    .logo-drop-zone.hover { border-color: #d4a853; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel" data-presets="react">
+    const { useState, useEffect, useRef, useCallback } = React;
+    const { motion, AnimatePresence } = window.Motion || window.FramerMotion || {};
+
+    // ── Constants ──────────────────────────────────────────────
+    const INPUT_TYPES  = ["URL", "Text", "WiFi", "vCard"];
+    const DOT_STYLES   = ["square","dots","rounded","classy","classy-rounded","extra-rounded"];
+    const EYE_STYLES   = ["square","extra-rounded","dot"];
+    const EC_LEVELS    = ["L","M","Q","H"];
+
+    // ── Encoders ───────────────────────────────────────────────
+    function encodeWifi({ ssid, password, security, hidden }) {
+      return `WIFI:T:${security};S:${ssid};P:${password};H:${hidden ? "true" : "false"};;`;
+    }
+    function encodeVCard({ name, phone, email, org, url }) {
+      return `BEGIN:VCARD\nVERSION:3.0\nFN:${name}\nTEL:${phone}\nEMAIL:${email}\nORG:${org}\nURL:${url}\nEND:VCARD`;
+    }
+
+    // ── Contrast helpers ───────────────────────────────────────
+    function hexToRgb(hex) {
+      const c = hex.replace("#","");
+      return [parseInt(c.slice(0,2),16), parseInt(c.slice(2,4),16), parseInt(c.slice(4,6),16)];
+    }
+    function luminance(r,g,b) {
+      return [r,g,b].reduce((acc,v,i) => {
+        const s = v/255;
+        return acc + (s<=0.03928 ? s/12.92 : Math.pow((s+0.055)/1.055,2.4)) * [0.2126,0.7152,0.0722][i];
+      }, 0);
+    }
+    function contrastRatio(h1,h2) {
+      const l1 = luminance(...hexToRgb(h1));
+      const l2 = luminance(...hexToRgb(h2));
+      return (Math.max(l1,l2)+0.05) / (Math.min(l1,l2)+0.05);
+    }
+
+    // ── Fallback motion wrappers (if Framer Motion fails to load) ──
+    const Div = motion ? motion.div : (props) => { const {children,...rest} = props; delete rest.initial; delete rest.animate; delete rest.exit; delete rest.transition; return <div {...rest}>{children}</div>; };
+    const Header = motion ? motion.header : (props) => { const {children,...rest} = props; delete rest.initial; delete rest.animate; delete rest.exit; delete rest.transition; return <header {...rest}>{children}</header>; };
+
+    // ── Main App ───────────────────────────────────────────────
+    function QRKey() {
+      const canvasRef   = useRef(null);
+      const qrRef       = useRef(null);
+      const logoInputRef = useRef(null);
+
+      const [activeTab, setActiveTab] = useState("URL");
+      const [qrReady,   setQrReady]   = useState(false);
+      const [libLoaded, setLibLoaded] = useState(!!window.QRCodeStyling);
+
+      // Inputs
+      const [urlValue,  setUrlValue]  = useState("https://anthropic.com");
+      const [textValue, setTextValue] = useState("Hello, World!");
+      const [wifiData,  setWifiData]  = useState({ ssid:"", password:"", security:"WPA", hidden:false });
+      const [vcardData, setVcardData] = useState({ name:"", phone:"", email:"", org:"", url:"" });
+
+      // Style
+      const [fgColor,       setFgColor]       = useState("#0a0a0a");
+      const [bgColor,       setBgColor]       = useState("#ffffff");
+      const [transparentBg, setTransparentBg] = useState(false);
+      const [dotStyle,      setDotStyle]      = useState("rounded");
+      const [eyeStyle,      setEyeStyle]      = useState("extra-rounded");
+      const [ecLevel,       setEcLevel]       = useState("M");
+      const [logoUrl,       setLogoUrl]       = useState(null);
+      const [logoSize,      setLogoSize]      = useState(0.25);
+      const [margin,        setMargin]        = useState(2);
+      const [qrSize]                          = useState(320);
+
+      // UI
+      const [contrastOk,  setContrastOk]  = useState(true);
+      const [contrastVal, setContrastVal] = useState("21.0");
+      const [downloading, setDownloading] = useState(null);
+      const [logoHover,   setLogoHover]   = useState(false);
+      const [notification,setNotification]= useState(null);
+
+      // Wait for QRCodeStyling to be available
+      useEffect(() => {
+        if (window.QRCodeStyling) { setLibLoaded(true); return; }
+        const id = setInterval(() => { if (window.QRCodeStyling) { setLibLoaded(true); clearInterval(id); } }, 200);
+        return () => clearInterval(id);
+      }, []);
+
+      const getQRData = useCallback(() => {
+        switch(activeTab) {
+          case "URL":   return urlValue  || "https://example.com";
+          case "Text":  return textValue || "Hello";
+          case "WiFi":  return encodeWifi(wifiData);
+          case "vCard": return encodeVCard(vcardData);
+          default:      return urlValue;
+        }
+      }, [activeTab, urlValue, textValue, wifiData, vcardData]);
+
+      // Contrast check
+      useEffect(() => {
+        if (transparentBg) { setContrastOk(true); return; }
+        const r = contrastRatio(fgColor, bgColor);
+        setContrastVal(r.toFixed(1));
+        setContrastOk(r >= 3);
+      }, [fgColor, bgColor, transparentBg]);
+
+      // Auto-upgrade EC when logo added
+      useEffect(() => {
+        if (logoUrl && (ecLevel === "L" || ecLevel === "M")) {
+          setEcLevel("H");
+          showNotification("Error correction upgraded to H for logo");
+        }
+      }, [logoUrl]);
+
+      const buildOptions = useCallback(() => {
+        const eyeMap = {
+          "square":        { outer:"square",        inner:"square" },
+          "extra-rounded": { outer:"extra-rounded", inner:"extra-rounded" },
+          "dot":           { outer:"extra-rounded", inner:"dot" },
+        };
+        const eye = eyeMap[eyeStyle] || eyeMap["extra-rounded"];
+        return {
+          width: qrSize, height: qrSize, type: "canvas",
+          data: getQRData(), margin,
+          qrOptions: { errorCorrectionLevel: ecLevel },
+          backgroundOptions: { color: transparentBg ? "transparent" : bgColor },
+          dotsOptions:         { color: fgColor, type: dotStyle },
+          cornersSquareOptions:{ color: fgColor, type: eye.outer },
+          cornersDotOptions:   { color: fgColor, type: eye.inner },
+          ...(logoUrl ? { image: logoUrl, imageOptions:{ crossOrigin:"anonymous", margin:4, imageSize:logoSize, hideBackgroundDots:true } } : {}),
+        };
+      }, [getQRData, fgColor, bgColor, transparentBg, dotStyle, eyeStyle, ecLevel, logoUrl, logoSize, qrSize, margin]);
+
+      // Init / update QR
+      useEffect(() => {
+        if (!libLoaded || !canvasRef.current) return;
+        const opts = buildOptions();
+        if (!qrRef.current) {
+          qrRef.current = new window.QRCodeStyling(opts);
+          qrRef.current.append(canvasRef.current);
+          setQrReady(true);
+        } else {
+          qrRef.current.update(opts);
+        }
+      }, [libLoaded, buildOptions]);
+
+      function showNotification(msg) {
+        setNotification(msg);
+        setTimeout(() => setNotification(null), 3000);
+      }
+
+      async function handleDownload(fmt) {
+        if (!qrRef.current) return;
+        setDownloading(fmt);
+        try {
+          await qrRef.current.download({ name:"qrkey", extension: fmt });
+          showNotification(`Downloaded as ${fmt.toUpperCase()}`);
+        } catch(e) { showNotification("Download failed"); }
+        setTimeout(() => setDownloading(null), 1000);
+      }
+
+      function handleLogoUpload(e) {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => setLogoUrl(ev.target.result);
+        reader.readAsDataURL(file);
+      }
+
+      function removeLogo() {
+        setLogoUrl(null);
+        if (logoInputRef.current) logoInputRef.current.value = "";
+        if (ecLevel === "H") setEcLevel("M");
+      }
+
+      const inputData = getQRData();
+
+      return (
+        <div style={{ fontFamily:"'DM Mono','Courier New',monospace", minHeight:"100vh", background:"#0c0c0c", color:"#e8e4dc", overflowX:"hidden" }}>
+
+          {/* Notification */}
+          {notification && (
+            <div className="notification-anim" style={{ position:"fixed", top:16, left:"50%", transform:"translateX(-50%)", zIndex:999, background:"#d4a853", color:"#0c0c0c", padding:"8px 20px", borderRadius:999, fontSize:12, fontWeight:500, boxShadow:"0 8px 32px rgba(0,0,0,0.5)", whiteSpace:"nowrap" }}>
+              {notification}
+            </div>
+          )}
+
+          {/* Header */}
+          <header className="fade-in" style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"20px 32px", borderBottom:"1px solid #1a1a1a" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+              <img src="data:image/png;base64,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" alt="Playology" style={{ width:44, height:44, objectFit:"contain" }} />
+              <div style={{ display:"flex", alignItems:"baseline", gap:8 }}>
+                <span style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:18, letterSpacing:"-0.02em" }}>QRKey</span>
+                <span style={{ fontSize:10, color:"#444", letterSpacing:"0.2em", textTransform:"uppercase" }}>Studio</span>
+              </div>
+            </div>
+            <div style={{ display:"flex", alignItems:"center", gap:8, fontSize:11, color:"#333" }}>
+              <span style={{ width:8, height:8, borderRadius:"50%", background:"#2a7a4b", display:"inline-block" }}></span>
+              client-side · private
+            </div>
+          </header>
+
+          {/* Body */}
+          <div style={{ display:"flex", flexWrap:"wrap", minHeight:"calc(100vh - 65px)" }}>
+
+            {/* ── LEFT PANEL ── */}
+            <div className="left-panel" style={{ width:400, minWidth:340, borderRight:"1px solid #1a1a1a", overflowY:"auto", maxHeight:"calc(100vh - 65px)", flexShrink:0 }}>
+
+              {/* Input type tabs */}
+              <div className="control-section" style={{ padding:24 }}>
+                <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:12 }}>Input Type</div>
+                <div style={{ display:"flex", gap:4, padding:4, background:"#111", borderRadius:10 }}>
+                  {INPUT_TYPES.map(tab => (
+                    <button key={tab} onClick={() => setActiveTab(tab)}
+                      className={`tab-pill ${activeTab===tab?"active":""}`}
+                      style={{ flex:1, padding:"8px 4px", borderRadius:7, fontSize:12, fontWeight:500, color: activeTab===tab?"#0c0c0c":"#555", fontFamily:"inherit" }}>
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Input fields */}
+              <div className="control-section" style={{ padding:24 }}>
+                {activeTab === "URL" && (
+                  <div>
+                    <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:8 }}>URL</div>
+                    <input className="input-field" placeholder="https://example.com" value={urlValue} onChange={e=>setUrlValue(e.target.value)} />
+                  </div>
+                )}
+                {activeTab === "Text" && (
+                  <div>
+                    <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:8 }}>Plain Text</div>
+                    <textarea className="input-field" rows={3} placeholder="Enter any text…" value={textValue} onChange={e=>setTextValue(e.target.value)} style={{ resize:"none", lineHeight:1.6 }} />
+                  </div>
+                )}
+                {activeTab === "WiFi" && (
+                  <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                    <div>
+                      <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:6 }}>Network Name (SSID)</div>
+                      <input className="input-field" placeholder="MyNetwork" value={wifiData.ssid} onChange={e=>setWifiData(p=>({...p,ssid:e.target.value}))} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:6 }}>Password</div>
+                      <input className="input-field" type="password" placeholder="••••••••" value={wifiData.password} onChange={e=>setWifiData(p=>({...p,password:e.target.value}))} />
+                    </div>
+                    <div style={{ display:"flex", gap:8 }}>
+                      {["WPA","WEP","nopass"].map(s => (
+                        <button key={s} onClick={()=>setWifiData(p=>({...p,security:s}))}
+                          style={{ flex:1, padding:"8px 0", borderRadius:8, fontSize:12, cursor:"pointer", fontFamily:"inherit", background:"transparent", border:`1px solid ${wifiData.security===s?"#d4a853":"#222"}`, color:wifiData.security===s?"#d4a853":"#555", transition:"all 0.15s" }}>
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                      <span style={{ fontSize:12, color:"#555" }}>Hidden Network</span>
+                      <div className={`toggle-switch ${wifiData.hidden?"on":""}`} onClick={()=>setWifiData(p=>({...p,hidden:!p.hidden}))} />
+                    </div>
+                  </div>
+                )}
+                {activeTab === "vCard" && (
+                  <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                    {[{key:"name",label:"Full Name",ph:"Jane Smith"},{key:"phone",label:"Phone",ph:"+1 555 000 0000"},{key:"email",label:"Email",ph:"jane@example.com"},{key:"org",label:"Organization",ph:"Acme Corp"},{key:"url",label:"Website",ph:"https://example.com"}].map(({key,label,ph})=>(
+                      <div key={key}>
+                        <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:6 }}>{label}</div>
+                        <input className="input-field" placeholder={ph} value={vcardData[key]} onChange={e=>setVcardData(p=>({...p,[key]:e.target.value}))} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Colors */}
+              <div className="control-section" style={{ padding:24 }}>
+                <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:16 }}>Colors</div>
+                <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                  {/* Foreground */}
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                    <span style={{ fontSize:12, color:"#888" }}>Foreground</span>
+                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                      <span style={{ fontSize:11, color:"#444", fontFamily:"monospace" }}>{fgColor}</span>
+                      <div style={{ width:36, height:36, borderRadius:8, border:"1px solid #2a2a2a", overflow:"hidden" }}>
+                        <input type="color" value={fgColor} onChange={e=>setFgColor(e.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+                  {/* Background */}
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                    <span style={{ fontSize:12, color:"#888" }}>Background</span>
+                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                      <span style={{ fontSize:11, color:"#444", fontFamily:"monospace" }}>{transparentBg?"transparent":bgColor}</span>
+                      {!transparentBg && (
+                        <div style={{ width:36, height:36, borderRadius:8, border:"1px solid #2a2a2a", overflow:"hidden" }}>
+                          <input type="color" value={bgColor} onChange={e=>setBgColor(e.target.value)} />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {/* Transparent toggle */}
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                    <span style={{ fontSize:12, color:"#888" }}>Transparent Background</span>
+                    <div className={`toggle-switch ${transparentBg?"on":""}`} onClick={()=>setTransparentBg(p=>!p)} />
+                  </div>
+                  {/* Contrast feedback */}
+                  {!transparentBg && !contrastOk && (
+                    <div className="contrast-warn">
+                      <span style={{ color:"#f5a623" }}>⚠</span>
+                      <span style={{ fontSize:11, color:"#f5a623" }}>Low contrast ({contrastVal}:1) — may not scan reliably</span>
+                    </div>
+                  )}
+                  {!transparentBg && contrastOk && (
+                    <span className="contrast-ok">✓ Contrast {contrastVal}:1 — scannable</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Dot Style */}
+              <div className="control-section" style={{ padding:24 }}>
+                <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:14 }}>Dot Pattern</div>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8 }}>
+                  {DOT_STYLES.map(style => (
+                    <button key={style} onClick={()=>setDotStyle(style)}
+                      className={`dot-btn ${dotStyle===style?"active":""}`}
+                      style={{ padding:"8px 4px", borderRadius:8, fontSize:11, cursor:"pointer", fontFamily:"inherit", background: dotStyle===style?"rgba(212,168,83,0.06)":"transparent", border:`1px solid ${dotStyle===style?"#d4a853":"#1e1e1e"}`, color: dotStyle===style?"#d4a853":"#555" }}>
+                      {style.replace("-"," ")}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Eye Style */}
+              <div className="control-section" style={{ padding:24 }}>
+                <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:14 }}>Corner Eyes</div>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8 }}>
+                  {EYE_STYLES.map(style => (
+                    <button key={style} onClick={()=>setEyeStyle(style)}
+                      className={`dot-btn ${eyeStyle===style?"active":""}`}
+                      style={{ padding:"8px 4px", borderRadius:8, fontSize:11, cursor:"pointer", fontFamily:"inherit", background: eyeStyle===style?"rgba(212,168,83,0.06)":"transparent", border:`1px solid ${eyeStyle===style?"#d4a853":"#1e1e1e"}`, color: eyeStyle===style?"#d4a853":"#555" }}>
+                      {style==="extra-rounded"?"rounded":style}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Error Correction */}
+              <div className="control-section" style={{ padding:24 }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
+                  <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555" }}>Error Correction</div>
+                  <div style={{ fontSize:10, color:"#333" }}>{ecLevel==="L"?"7%":ecLevel==="M"?"15%":ecLevel==="Q"?"25%":"30%"} recovery</div>
+                </div>
+                <div style={{ display:"flex", gap:4 }}>
+                  {EC_LEVELS.map(level => (
+                    <button key={level} onClick={()=>setEcLevel(level)}
+                      style={{ flex:1, padding:"8px 0", borderRadius:8, fontSize:12, fontFamily:"'DM Mono',monospace", cursor:"pointer", background: ecLevel===level?"rgba(212,168,83,0.06)":"transparent", border:`1px solid ${ecLevel===level?"#d4a853":"#1e1e1e"}`, color: ecLevel===level?"#d4a853":"#555" }}>
+                      {level}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Logo */}
+              <div className="control-section" style={{ padding:24 }}>
+                <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:14 }}>Logo / Watermark</div>
+                {!logoUrl ? (
+                  <div className={`logo-drop-zone ${logoHover?"hover":""}`}
+                    onClick={()=>logoInputRef.current?.click()}
+                    onDragOver={e=>{e.preventDefault();setLogoHover(true);}}
+                    onDragLeave={()=>setLogoHover(false)}
+                    onDrop={e=>{e.preventDefault();setLogoHover(false);const f=e.dataTransfer.files?.[0];if(f){const r=new FileReader();r.onload=ev=>setLogoUrl(ev.target.result);r.readAsDataURL(f);}}}>
+                    <div style={{ fontSize:24, opacity:0.3, marginBottom:8 }}>⊕</div>
+                    <div style={{ fontSize:12, color:"#444" }}>Drop image or click to upload</div>
+                    <div style={{ fontSize:10, color:"#333", marginTop:4 }}>PNG, SVG, JPG</div>
+                  </div>
+                ) : (
+                  <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:12, background:"#111", borderRadius:12, padding:12 }}>
+                      <img src={logoUrl} alt="logo" style={{ width:40, height:40, borderRadius:8, objectFit:"contain", background:"white", padding:4 }} />
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:12, color:"#888" }}>Logo uploaded</div>
+                        <div style={{ fontSize:10, color:"#444" }}>EC upgraded to H</div>
+                      </div>
+                      <button onClick={removeLogo} style={{ background:"transparent", border:"none", cursor:"pointer", color:"#444", fontSize:20, lineHeight:1, transition:"color 0.15s" }}
+                        onMouseEnter={e=>e.target.style.color="#d4a853"} onMouseLeave={e=>e.target.style.color="#444"}>×</button>
+                    </div>
+                    <div>
+                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
+                        <span style={{ fontSize:12, color:"#555" }}>Size</span>
+                        <span style={{ fontSize:11, fontFamily:"monospace", color:"#444" }}>{Math.round(logoSize*100)}%</span>
+                      </div>
+                      <input type="range" min="10" max="40" value={logoSize*100} onChange={e=>setLogoSize(parseInt(e.target.value)/100)} />
+                    </div>
+                  </div>
+                )}
+                <input ref={logoInputRef} type="file" accept="image/*" style={{ display:"none" }} onChange={handleLogoUpload} />
+              </div>
+
+              {/* Margin */}
+              <div style={{ padding:24 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:12 }}>
+                  <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555" }}>Quiet Zone Margin</div>
+                  <span style={{ fontSize:11, fontFamily:"monospace", color:"#444" }}>{margin}px</span>
+                </div>
+                <input type="range" min="0" max="10" value={margin} onChange={e=>setMargin(parseInt(e.target.value))} />
+              </div>
+            </div>
+
+            {/* ── RIGHT PANEL ── */}
+            <div className="right-panel" style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:48, gap:32, minWidth:340 }}>
+
+              {/* QR Preview */}
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:24 }}>
+                <div style={{ position:"relative" }}>
+                  {/* Ambient glow */}
+                  <div style={{ position:"absolute", inset:0, borderRadius:20, filter:"blur(40px)", opacity:0.15, transform:"scale(1.1)", background:fgColor, pointerEvents:"none" }} />
+                  {/* Canvas wrapper */}
+                  <div style={{
+                    position:"relative", borderRadius:20, overflow:"hidden",
+                    boxShadow:"0 24px 80px rgba(0,0,0,0.6)",
+                    background: transparentBg ? "repeating-conic-gradient(#1a1a1a 0% 25%, #111 0% 50%) 0 0 / 16px 16px" : bgColor,
+                    padding:12, border:"1px solid #1e1e1e"
+                  }}>
+                    {!libLoaded && (
+                      <div className="qr-loading" style={{ width:qrSize, height:qrSize, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                        <span style={{ fontSize:11, color:"#333", letterSpacing:"0.2em" }}>LOADING ENGINE</span>
+                      </div>
+                    )}
+                    <div ref={canvasRef} style={{ display: libLoaded ? "block" : "none" }} />
+                  </div>
+                </div>
+
+                {/* Data preview pill */}
+                <div style={{ display:"flex", alignItems:"center", gap:8, background:"#111", border:"1px solid #1a1a1a", borderRadius:999, padding:"8px 16px", maxWidth:360, width:"100%" }}>
+                  <span style={{ fontSize:12, color:"#444", flexShrink:0 }}>
+                    {activeTab==="URL"?"🔗":activeTab==="WiFi"?"📶":activeTab==="vCard"?"👤":"📝"}
+                  </span>
+                  <span style={{ fontSize:11, color:"#555", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", fontFamily:"monospace" }}>
+                    {inputData.substring(0,60)}{inputData.length>60?"…":""}
+                  </span>
+                  <span style={{ fontSize:10, color:"#333", flexShrink:0, marginLeft:"auto" }}>{inputData.length}c</span>
+                </div>
+              </div>
+
+              {/* Download buttons */}
+              <div style={{ display:"flex", gap:12, width:"100%", maxWidth:360 }}>
+                {["png","svg"].map(fmt => (
+                  <button key={fmt} onClick={()=>handleDownload(fmt)} disabled={!qrReady || !!downloading}
+                    className="download-btn"
+                    style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:8, padding:"12px 24px", borderRadius:12, border:"1px solid #2a2a2a", fontSize:13, color:"#888", fontFamily:"inherit" }}>
+                    {downloading===fmt ? (
+                      <span style={{ fontSize:10, letterSpacing:"0.2em" }}>SAVING…</span>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+                          <path d="M7 1v8M4 6l3 3 3-3M1 10v1a2 2 0 002 2h8a2 2 0 002-2v-1"/>
+                        </svg>
+                        Download {fmt.toUpperCase()}
+                      </>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* Info tiles */}
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, width:"100%", maxWidth:360 }}>
+                {[{icon:"⬡",label:"Client-side",sub:"100% private"},{icon:"◈",label:"Vector SVG",sub:"Infinite scale"},{icon:"◉",label:"EC Level H",sub:"30% recovery"}].map(({icon,label,sub})=>(
+                  <div key={label} style={{ background:"#0e0e0e", border:"1px solid #151515", borderRadius:12, padding:12, textAlign:"center" }}>
+                    <div style={{ fontSize:18, opacity:0.3, marginBottom:4 }}>{icon}</div>
+                    <div style={{ fontSize:10, color:"#666" }}>{label}</div>
+                    <div style={{ fontSize:9, color:"#333", marginTop:2 }}>{sub}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Mount
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<QRKey />);
+  </script>
+</body>
+</html>
