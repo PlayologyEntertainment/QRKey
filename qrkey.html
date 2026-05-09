@@ -3,157 +3,469 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QRKey Studio</title>
+  <title>QRKey // TERMINAL</title>
 
-  <!-- React + ReactDOM UMD -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-
-  <!-- Babel Standalone for JSX transpilation -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-  <!-- Framer Motion UMD -->
-  <script src="https://unpkg.com/framer-motion@11/dist/framer-motion.js"></script>
-
-  <!-- QR Code Styling -->
   <script src="https://cdn.jsdelivr.net/npm/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Playfair+Display:wght@400;700;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet" />
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root { height: 100%; }
-    body { background: #0c0c0c; }
 
-    ::-webkit-scrollbar { width: 4px; }
-    ::-webkit-scrollbar-track { background: #0c0c0c; }
-    ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
-
-    .qr-preview-wrapper canvas { border-radius: 12px; display: block; }
-
-    .dot-btn { transition: all 0.15s ease; }
-    .dot-btn:hover { transform: scale(1.05); }
-    .dot-btn.active { box-shadow: 0 0 0 2px #d4a853; }
-
-    .control-section { border-bottom: 1px solid #1e1e1e; }
-
-    input[type="color"] {
-      -webkit-appearance: none;
-      border: none;
-      width: 36px; height: 36px;
-      border-radius: 8px;
-      cursor: pointer;
-      padding: 2px;
-      background: transparent;
+    :root {
+      --bg:        #0a0a0a;
+      --primary:   #33ff00;
+      --secondary: #ffb000;
+      --muted:     #1f521f;
+      --error:     #ff3333;
+      --border:    #1f521f;
+      --font:      'JetBrains Mono', 'Fira Code', monospace;
+      --glow:      0 0 6px rgba(51,255,0,0.55);
+      --glow-md:   0 0 12px rgba(51,255,0,0.35);
     }
-    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; border-radius: 6px; }
-    input[type="color"]::-webkit-color-swatch { border: none; border-radius: 6px; }
 
+    body {
+      background: var(--bg);
+      color: var(--primary);
+      font-family: var(--font);
+      font-size: 13px;
+      overflow-x: hidden;
+    }
+
+    /* ── CRT scanline overlay ── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 3px,
+        rgba(0,0,0,0.10) 3px,
+        rgba(0,0,0,0.10) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--muted); }
+
+    /* ── Typography ── */
+    .term-label {
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-shadow: none;
+    }
+    .term-glow { text-shadow: var(--glow); }
+    .term-heading {
+      font-size: 18px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      text-shadow: var(--glow-md);
+    }
+
+    /* ── Blink animation ── */
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    .blink { animation: blink 1.1s step-end infinite; }
+
+    @keyframes scanIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
+    .scan-in { animation: scanIn 0.4s ease forwards; }
+
+    /* ── Boot / Onboarding ── */
+    @keyframes bootFadeIn  { from{opacity:0} to{opacity:1} }
+    @keyframes bootFadeOut { from{opacity:1} to{opacity:0} }
+    @keyframes progressFill { from{width:0%} to{width:100%} }
+    @keyframes lineIn { from{opacity:0;transform:translateX(-6px)} to{opacity:1;transform:translateX(0)} }
+
+    .boot-screen {
+      position: fixed; inset: 0;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      z-index: 100;
+    }
+    .boot-fade-in  { animation: bootFadeIn 0.45s ease forwards; }
+    .boot-fade-out { animation: bootFadeOut 0.45s ease forwards; }
+
+    .boot-inner {
+      width: 100%;
+      max-width: 560px;
+      display: flex; flex-direction: column; align-items: center;
+      text-align: center;
+    }
+
+    .boot-logo {
+      width: clamp(72px, 14vw, 110px);
+      height: clamp(72px, 14vw, 110px);
+      object-fit: contain;
+      opacity: 0;
+      animation: bootFadeIn 0.6s ease 0.1s forwards;
+      margin-bottom: 22px;
+      filter: drop-shadow(0 0 8px rgba(51,255,0,0.25));
+    }
+
+    .boot-wordmark {
+      font-family: var(--font);
+      font-weight: 700;
+      font-size: clamp(38px, 9vw, 64px);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--primary);
+      text-shadow: 0 0 14px rgba(51,255,0,0.55), 0 0 26px rgba(51,255,0,0.25);
+      white-space: nowrap;
+      overflow: hidden;
+      border-right: 2px solid transparent; /* typing caret slot */
+    }
+    .boot-wordmark.typing {
+      width: 0;
+      animation: typeWord 0.9s steps(6, end) 0.3s forwards;
+    }
+    .boot-wordmark .caret {
+      display: inline-block;
+      width: 0.55ch;
+      margin-left: 2px;
+      color: var(--primary);
+    }
+    @keyframes typeWord { from{width:0} to{width:6.2ch} }
+
+    .boot-sub {
+      margin-top: 14px;
+      font-size: clamp(10px, 2.4vw, 12px);
+      letter-spacing: 0.25em;
+      color: var(--muted);
+      text-transform: uppercase;
+      opacity: 0;
+      animation: bootFadeIn 0.5s ease 1.2s forwards;
+    }
+
+    .boot-progress-wrap {
+      margin-top: 32px;
+      width: min(360px, 90%);
+      opacity: 0;
+      animation: bootFadeIn 0.4s ease 1.4s forwards;
+    }
+    .boot-progress-label {
+      display: flex; justify-content: space-between;
+      font-size: 10px; letter-spacing: 0.18em;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+    .boot-progress-track {
+      height: 10px;
+      border: 1px solid var(--border);
+      background: rgba(51,255,0,0.04);
+      position: relative;
+      overflow: hidden;
+    }
+    .boot-progress-fill {
+      height: 100%;
+      background: var(--primary);
+      box-shadow: var(--glow);
+      width: 0%;
+      animation: progressFill 1.55s linear 1.4s forwards;
+    }
+
+    /* Intro screen */
+    .boot-intro-prompt {
+      font-size: clamp(12px, 2.8vw, 14px);
+      color: var(--primary);
+      text-shadow: var(--glow);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin-bottom: 22px;
+      opacity: 0;
+      animation: lineIn 0.4s ease 0.05s forwards;
+    }
+    .boot-line {
+      font-size: clamp(13px, 3vw, 15px);
+      color: var(--primary);
+      line-height: 1.65;
+      letter-spacing: 0.02em;
+      text-align: left;
+      width: 100%;
+      max-width: 520px;
+      opacity: 0;
+      animation: lineIn 0.4s ease forwards;
+    }
+    .boot-line .arrow { color: var(--muted); margin-right: 10px; }
+    .boot-line.l1 { animation-delay: 0.35s; }
+    .boot-line.l2 { animation-delay: 0.85s; }
+    .boot-line.l3 { animation-delay: 1.35s; }
+
+    .boot-btn {
+      margin-top: 36px;
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      color: var(--primary);
+      background: transparent;
+      border: 1px solid var(--primary);
+      padding: 14px 28px;
+      cursor: pointer;
+      text-shadow: var(--glow);
+      box-shadow: 0 0 0 rgba(51,255,0,0);
+      transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.05s ease;
+      opacity: 0;
+      animation: bootFadeIn 0.4s ease 1.85s forwards;
+      min-height: 44px;
+    }
+    .boot-btn:hover {
+      background: rgba(51,255,0,0.08);
+      box-shadow: var(--glow-md);
+    }
+    .boot-btn:active { transform: translateY(1px); }
+
+    @media (max-width: 480px) {
+      .boot-btn { width: 100%; max-width: 360px; }
+      .boot-line { padding: 0 4px; }
+    }
+
+    /* ── Pane (terminal window) ── */
+    .pane {
+      border: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .pane-header {
+      border-bottom: 1px solid var(--border);
+      padding: 6px 14px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--primary);
+      text-shadow: var(--glow);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(51,255,0,0.04);
+    }
+
+    /* ── Input fields ── */
+    .term-input {
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid var(--muted);
+      color: var(--primary);
+      font-family: var(--font);
+      font-size: 13px;
+      padding: 6px 0 6px 4px;
+      width: 100%;
+      outline: none;
+      text-shadow: var(--glow);
+      caret-color: var(--primary);
+    }
+    .term-input:focus { border-bottom-color: var(--primary); }
+    .term-input::placeholder { color: var(--muted); text-shadow: none; }
+    .term-input[type="password"] { letter-spacing: 0.2em; }
+
+    textarea.term-input { resize: none; border: 1px solid var(--muted); padding: 8px; line-height: 1.6; }
+    textarea.term-input:focus { border-color: var(--primary); }
+
+    /* ── Buttons ── */
+    .term-btn {
+      background: transparent;
+      border: 1px solid var(--muted);
+      color: var(--muted);
+      font-family: var(--font);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: all 0.12s;
+      position: relative;
+      overflow: hidden;
+    }
+    .term-btn:hover {
+      background: var(--primary);
+      color: #000;
+      border-color: var(--primary);
+      text-shadow: none;
+      box-shadow: var(--glow-md);
+    }
+    .term-btn.active {
+      background: var(--primary);
+      color: #000;
+      border-color: var(--primary);
+      text-shadow: none;
+      box-shadow: var(--glow);
+    }
+    .term-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .term-btn:disabled:hover { background: transparent; color: var(--muted); border-color: var(--muted); box-shadow: none; }
+
+    /* ── Tab row ── */
+    .tab-row {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      border-right: 1px solid var(--border);
+      color: var(--muted);
+      font-family: var(--font);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      padding: 8px 4px;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .tab-btn:last-child { border-right: none; }
+    .tab-btn:hover { color: var(--primary); background: rgba(51,255,0,0.04); }
+    .tab-btn.active {
+      color: #000;
+      background: var(--primary);
+      text-shadow: none;
+    }
+
+    /* ── Toggle ── */
+    .term-toggle {
+      position: relative;
+      width: 44px; height: 20px;
+      border: 1px solid var(--muted);
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: border-color 0.15s;
+    }
+    .term-toggle.on { border-color: var(--primary); box-shadow: var(--glow); }
+    .term-toggle::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 14px; height: 14px;
+      background: var(--muted);
+      transition: all 0.15s;
+    }
+    .term-toggle.on::after { transform: translateX(24px); background: var(--primary); }
+
+    /* ── Range slider ── */
     input[type="range"] {
       -webkit-appearance: none;
-      width: 100%; height: 3px;
-      background: #2a2a2a;
-      border-radius: 2px;
+      width: 100%; height: 2px;
+      background: var(--muted);
       outline: none;
+      border-radius: 0;
     }
     input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 14px; height: 14px;
-      border-radius: 50%;
-      background: #d4a853;
+      width: 12px; height: 12px;
+      background: var(--primary);
+      border-radius: 0;
       cursor: pointer;
-      transition: transform 0.1s;
+      box-shadow: var(--glow);
     }
-    input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
 
-    .tab-pill { transition: all 0.2s ease; cursor: pointer; border: none; background: transparent; }
-    .tab-pill.active { background: #d4a853; color: #0c0c0c; }
-
-    .input-field {
-      background: #111;
-      border: 1px solid #222;
-      color: #e8e4dc;
-      border-radius: 8px;
-      padding: 10px 14px;
-      width: 100%;
-      font-family: 'DM Mono', monospace;
-      font-size: 13px;
-      outline: none;
-      transition: border-color 0.15s;
-    }
-    .input-field:focus { border-color: #d4a853; }
-    .input-field::placeholder { color: #444; }
-
-    .toggle-switch {
-      position: relative;
-      width: 40px; height: 22px;
-      background: #222;
-      border-radius: 11px;
+    /* ── Color input ── */
+    input[type="color"] {
+      -webkit-appearance: none;
+      border: 1px solid var(--muted);
+      width: 32px; height: 24px;
+      padding: 1px;
+      background: transparent;
       cursor: pointer;
-      transition: background 0.2s;
-      flex-shrink: 0;
+      border-radius: 0;
     }
-    .toggle-switch.on { background: #d4a853; }
-    .toggle-switch::after {
-      content: '';
-      position: absolute;
-      top: 3px; left: 3px;
-      width: 16px; height: 16px;
-      background: white;
-      border-radius: 50%;
-      transition: transform 0.2s;
-    }
-    .toggle-switch.on::after { transform: translateX(18px); }
+    input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+    input[type="color"]::-webkit-color-swatch { border: none; }
 
-    .download-btn {
-      transition: all 0.2s ease;
+    /* ── Download buttons ── */
+    .dl-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 16px;
+      background: transparent;
+      border: 1px solid var(--muted);
+      color: var(--muted);
+      font-family: var(--font);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      cursor: pointer;
+      transition: all 0.15s;
       position: relative;
       overflow: hidden;
-      cursor: pointer;
-      background: transparent;
     }
-    .download-btn::before {
+    .dl-btn::before {
       content: '';
       position: absolute;
       inset: 0;
-      background: rgba(212,168,83,0.1);
+      background: var(--primary);
       transform: scaleX(0);
       transform-origin: left;
-      transition: transform 0.3s ease;
+      transition: transform 0.25s;
     }
-    .download-btn:hover::before { transform: scaleX(1); }
-    .download-btn:hover { border-color: #d4a853 !important; color: #d4a853 !important; }
-    .download-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .dl-btn:hover::before { transform: scaleX(1); }
+    .dl-btn:hover { color: #000; border-color: var(--primary); box-shadow: var(--glow-md); }
+    .dl-btn span { position: relative; z-index: 1; }
+    .dl-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .dl-btn:disabled:hover::before { transform: scaleX(0); }
+    .dl-btn:disabled:hover { color: var(--muted); border-color: var(--muted); box-shadow: none; }
 
-    @keyframes qrPulse { 0%,100%{opacity:1} 50%{opacity:0.7} }
-    .qr-loading { animation: qrPulse 1.2s ease infinite; }
-
-    @keyframes fadeDown { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:translateY(0)} }
-    .notification-anim { animation: fadeDown 0.3s ease; }
-
-    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-    .fade-in { animation: fadeIn 0.5s ease forwards; }
-
-    .left-panel { animation: fadeIn 0.6s 0.1s ease both; }
-    .right-panel { animation: fadeIn 0.6s 0.2s ease both; }
-
-    .contrast-warn {
-      display: flex; align-items: center; gap: 8px;
-      background: #2a1a0a; border: 1px solid #5a3a1a;
-      border-radius: 8px; padding: 8px 12px;
+    /* ── Progress bar ── */
+    .term-bar {
+      font-size: 11px;
+      color: var(--primary);
+      text-shadow: var(--glow);
+      font-family: var(--font);
+      letter-spacing: 0;
     }
-    .contrast-ok { font-size: 10px; color: #2a7a4b; }
 
-    .logo-drop-zone {
-      border: 2px dashed #1e1e1e;
-      border-radius: 12px; padding: 24px;
-      text-align: center; cursor: pointer;
-      transition: border-color 0.2s;
+    /* ── Prompt prefix ── */
+    .prompt { color: var(--secondary); text-shadow: 0 0 6px rgba(255,176,0,0.5); }
+
+    /* ── Notification ── */
+    @keyframes ntfIn { from{opacity:0;top:4px} to{opacity:1;top:16px} }
+    .ntf { animation: ntfIn 0.25s ease forwards; }
+
+    /* ── QR canvas ── */
+    .qr-wrap canvas { display: block; image-rendering: pixelated; }
+
+    /* ── Logo drop zone ── */
+    .drop-zone {
+      border: 1px dashed var(--muted);
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
     }
-    .logo-drop-zone:hover { border-color: #2a2a2a; }
-    .logo-drop-zone.hover { border-color: #d4a853; }
+    .drop-zone:hover, .drop-zone.hover { border-color: var(--primary); background: rgba(51,255,0,0.03); }
+
+    /* ── Control section divider ── */
+    .ctrl-section { border-bottom: 1px solid var(--border); padding: 16px; }
+
+    /* ── Glitch on hover ── */
+    @keyframes glitch {
+      0%   { clip-path: inset(20% 0 60% 0); transform: translateX(-2px); }
+      20%  { clip-path: inset(60% 0 10% 0); transform: translateX(2px); }
+      40%  { clip-path: inset(40% 0 40% 0); transform: translateX(-1px); }
+      60%  { clip-path: inset(80% 0 5%  0); transform: translateX(1px); }
+      80%  { clip-path: inset(10% 0 70% 0); transform: translateX(-2px); }
+      100% { clip-path: inset(0% 0 0%  0); transform: translateX(0); }
+    }
+
+    /* ── Typewriter ── */
+    @keyframes typing {
+      from { width: 0; }
+      to   { width: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -161,468 +473,548 @@
 
   <script type="text/babel" data-presets="react">
     const { useState, useEffect, useRef, useCallback } = React;
-    const { motion, AnimatePresence } = window.Motion || window.FramerMotion || {};
 
-    // ── Constants ──────────────────────────────────────────────
-    const INPUT_TYPES  = ["URL", "Text", "WiFi", "vCard"];
-    const DOT_STYLES   = ["square","dots","rounded","classy","classy-rounded","extra-rounded"];
-    const EYE_STYLES   = ["square","extra-rounded","dot"];
-    const EC_LEVELS    = ["L","M","Q","H"];
+    // ── Constants ────────────────────────────────────────────
+    const INPUT_TYPES = ["URL","Text","WiFi","vCard"];
+    const DOT_STYLES  = ["square","dots","rounded","classy","classy-rounded","extra-rounded"];
+    const EYE_STYLES  = ["square","extra-rounded","dot"];
+    const EC_LEVELS   = ["L","M","Q","H"];
+    const EC_INFO     = {L:"07%",M:"15%",Q:"25%",H:"30%"};
 
-    // ── Encoders ───────────────────────────────────────────────
-    function encodeWifi({ ssid, password, security, hidden }) {
-      return `WIFI:T:${security};S:${ssid};P:${password};H:${hidden ? "true" : "false"};;`;
+    const LOGO_B64 = "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";
+
+    // ── Encoders ─────────────────────────────────────────────
+    function encodeWifi({ssid,password,security,hidden}) {
+      return `WIFI:T:${security};S:${ssid};P:${password};H:${hidden?"true":"false"};;`;
     }
-    function encodeVCard({ name, phone, email, org, url }) {
+    function encodeVCard({name,phone,email,org,url}) {
       return `BEGIN:VCARD\nVERSION:3.0\nFN:${name}\nTEL:${phone}\nEMAIL:${email}\nORG:${org}\nURL:${url}\nEND:VCARD`;
     }
 
-    // ── Contrast helpers ───────────────────────────────────────
+    // ── Contrast ─────────────────────────────────────────────
     function hexToRgb(hex) {
       const c = hex.replace("#","");
-      return [parseInt(c.slice(0,2),16), parseInt(c.slice(2,4),16), parseInt(c.slice(4,6),16)];
+      return [parseInt(c.slice(0,2),16),parseInt(c.slice(2,4),16),parseInt(c.slice(4,6),16)];
     }
-    function luminance(r,g,b) {
-      return [r,g,b].reduce((acc,v,i) => {
-        const s = v/255;
-        return acc + (s<=0.03928 ? s/12.92 : Math.pow((s+0.055)/1.055,2.4)) * [0.2126,0.7152,0.0722][i];
-      }, 0);
+    function lum(r,g,b) {
+      return [r,g,b].reduce((a,v,i)=>{
+        const s=v/255; return a+(s<=0.03928?s/12.92:Math.pow((s+0.055)/1.055,2.4))*[0.2126,0.7152,0.0722][i];
+      },0);
     }
-    function contrastRatio(h1,h2) {
-      const l1 = luminance(...hexToRgb(h1));
-      const l2 = luminance(...hexToRgb(h2));
-      return (Math.max(l1,l2)+0.05) / (Math.min(l1,l2)+0.05);
+    function contrast(h1,h2) {
+      const l1=lum(...hexToRgb(h1)),l2=lum(...hexToRgb(h2));
+      return ((Math.max(l1,l2)+0.05)/(Math.min(l1,l2)+0.05)).toFixed(1);
     }
 
-    // ── Fallback motion wrappers (if Framer Motion fails to load) ──
-    const Div = motion ? motion.div : (props) => { const {children,...rest} = props; delete rest.initial; delete rest.animate; delete rest.exit; delete rest.transition; return <div {...rest}>{children}</div>; };
-    const Header = motion ? motion.header : (props) => { const {children,...rest} = props; delete rest.initial; delete rest.animate; delete rest.exit; delete rest.transition; return <header {...rest}>{children}</header>; };
+    // ── Progress bar ─────────────────────────────────────────
+    function TermBar({value, max=10, width=20}) {
+      const filled = Math.round((value/max)*width);
+      const empty  = width - filled;
+      return (
+        <span className="term-bar">
+          [{"█".repeat(filled)}{"░".repeat(empty)}]
+        </span>
+      );
+    }
 
-    // ── Main App ───────────────────────────────────────────────
+    // ── Main App ─────────────────────────────────────────────
     function QRKey() {
-      const canvasRef   = useRef(null);
-      const qrRef       = useRef(null);
+      const canvasRef    = useRef(null);
+      const qrRef        = useRef(null);
       const logoInputRef = useRef(null);
 
-      const [activeTab, setActiveTab] = useState("URL");
-      const [qrReady,   setQrReady]   = useState(false);
-      const [libLoaded, setLibLoaded] = useState(!!window.QRCodeStyling);
+      // Onboarding flow: "title" -> "intro" -> "app"
+      const [screen, setScreen] = useState("title");
+      const [screenLeaving, setScreenLeaving] = useState(false);
+
+      // Title screen lingers 3s, then fades to intro
+      useEffect(()=>{
+        if (screen !== "title") return;
+        const leaveTimer = setTimeout(()=>setScreenLeaving(true), 3000);
+        const swapTimer  = setTimeout(()=>{ setScreen("intro"); setScreenLeaving(false); }, 3450);
+        return ()=>{ clearTimeout(leaveTimer); clearTimeout(swapTimer); };
+      },[screen]);
+
+      function startApp(){
+        setScreenLeaving(true);
+        setTimeout(()=>{ setScreen("app"); setScreenLeaving(false); }, 450);
+      }
+
+      const [activeTab,    setActiveTab]    = useState("URL");
+      const [qrReady,      setQrReady]      = useState(false);
+      const [libLoaded,    setLibLoaded]    = useState(!!window.QRCodeStyling);
+      const [tick,         setTick]         = useState(true); // cursor blink
 
       // Inputs
       const [urlValue,  setUrlValue]  = useState("https://anthropic.com");
       const [textValue, setTextValue] = useState("Hello, World!");
-      const [wifiData,  setWifiData]  = useState({ ssid:"", password:"", security:"WPA", hidden:false });
-      const [vcardData, setVcardData] = useState({ name:"", phone:"", email:"", org:"", url:"" });
+      const [wifiData,  setWifiData]  = useState({ssid:"",password:"",security:"WPA",hidden:false});
+      const [vcardData, setVcardData] = useState({name:"",phone:"",email:"",org:"",url:""});
 
       // Style
-      const [fgColor,       setFgColor]       = useState("#0a0a0a");
-      const [bgColor,       setBgColor]       = useState("#ffffff");
+      const [fgColor,       setFgColor]       = useState("#33ff00");
+      const [bgColor,       setBgColor]       = useState("#0a0a0a");
       const [transparentBg, setTransparentBg] = useState(false);
-      const [dotStyle,      setDotStyle]      = useState("rounded");
-      const [eyeStyle,      setEyeStyle]      = useState("extra-rounded");
+      const [dotStyle,      setDotStyle]      = useState("square");
+      const [eyeStyle,      setEyeStyle]      = useState("square");
       const [ecLevel,       setEcLevel]       = useState("M");
       const [logoUrl,       setLogoUrl]       = useState(null);
       const [logoSize,      setLogoSize]      = useState(0.25);
       const [margin,        setMargin]        = useState(2);
-      const [qrSize]                          = useState(320);
+      const [qrSize]                          = useState(300);
 
       // UI
-      const [contrastOk,  setContrastOk]  = useState(true);
-      const [contrastVal, setContrastVal] = useState("21.0");
-      const [downloading, setDownloading] = useState(null);
-      const [logoHover,   setLogoHover]   = useState(false);
-      const [notification,setNotification]= useState(null);
+      const [contrastOk,   setContrastOk]   = useState(true);
+      const [contrastVal,  setContrastVal]  = useState("21.0");
+      const [downloading,  setDownloading]  = useState(null);
+      const [logoHover,    setLogoHover]    = useState(false);
+      const [notification, setNotification] = useState(null);
+      const [cmdLine,      setCmdLine]      = useState("");
 
-      // Wait for QRCodeStyling to be available
-      useEffect(() => {
-        if (window.QRCodeStyling) { setLibLoaded(true); return; }
-        const id = setInterval(() => { if (window.QRCodeStyling) { setLibLoaded(true); clearInterval(id); } }, 200);
-        return () => clearInterval(id);
-      }, []);
+      // Cursor blink
+      useEffect(()=>{
+        const id = setInterval(()=>setTick(t=>!t),530);
+        return ()=>clearInterval(id);
+      },[]);
 
-      const getQRData = useCallback(() => {
-        switch(activeTab) {
+      // Boot QR lib
+      useEffect(()=>{
+        if (window.QRCodeStyling){setLibLoaded(true);return;}
+        const id=setInterval(()=>{if(window.QRCodeStyling){setLibLoaded(true);clearInterval(id);}},200);
+        return ()=>clearInterval(id);
+      },[]);
+
+      const getQRData = useCallback(()=>{
+        switch(activeTab){
           case "URL":   return urlValue  || "https://example.com";
           case "Text":  return textValue || "Hello";
           case "WiFi":  return encodeWifi(wifiData);
           case "vCard": return encodeVCard(vcardData);
           default:      return urlValue;
         }
-      }, [activeTab, urlValue, textValue, wifiData, vcardData]);
+      },[activeTab,urlValue,textValue,wifiData,vcardData]);
 
-      // Contrast check
-      useEffect(() => {
-        if (transparentBg) { setContrastOk(true); return; }
-        const r = contrastRatio(fgColor, bgColor);
-        setContrastVal(r.toFixed(1));
-        setContrastOk(r >= 3);
-      }, [fgColor, bgColor, transparentBg]);
+      useEffect(()=>{
+        if(transparentBg){setContrastOk(true);return;}
+        const r=contrast(fgColor,bgColor);
+        setContrastVal(r);
+        setContrastOk(parseFloat(r)>=3);
+      },[fgColor,bgColor,transparentBg]);
 
-      // Auto-upgrade EC when logo added
-      useEffect(() => {
-        if (logoUrl && (ecLevel === "L" || ecLevel === "M")) {
+      useEffect(()=>{
+        if(logoUrl&&(ecLevel==="L"||ecLevel==="M")){
           setEcLevel("H");
-          showNotification("Error correction upgraded to H for logo");
+          showNotification("[OK] EC auto-upgraded to H for logo integrity");
         }
-      }, [logoUrl]);
+      },[logoUrl]);
 
-      const buildOptions = useCallback(() => {
-        const eyeMap = {
-          "square":        { outer:"square",        inner:"square" },
-          "extra-rounded": { outer:"extra-rounded", inner:"extra-rounded" },
-          "dot":           { outer:"extra-rounded", inner:"dot" },
+      const buildOptions = useCallback(()=>{
+        const eyeMap={
+          "square":        {outer:"square",        inner:"square"},
+          "extra-rounded": {outer:"extra-rounded", inner:"extra-rounded"},
+          "dot":           {outer:"extra-rounded", inner:"dot"},
         };
-        const eye = eyeMap[eyeStyle] || eyeMap["extra-rounded"];
+        const eye = eyeMap[eyeStyle]||eyeMap["square"];
         return {
-          width: qrSize, height: qrSize, type: "canvas",
-          data: getQRData(), margin,
-          qrOptions: { errorCorrectionLevel: ecLevel },
-          backgroundOptions: { color: transparentBg ? "transparent" : bgColor },
-          dotsOptions:         { color: fgColor, type: dotStyle },
-          cornersSquareOptions:{ color: fgColor, type: eye.outer },
-          cornersDotOptions:   { color: fgColor, type: eye.inner },
-          ...(logoUrl ? { image: logoUrl, imageOptions:{ crossOrigin:"anonymous", margin:4, imageSize:logoSize, hideBackgroundDots:true } } : {}),
+          width:qrSize, height:qrSize, type:"canvas",
+          data:getQRData(), margin,
+          qrOptions:{errorCorrectionLevel:ecLevel},
+          backgroundOptions:{color:transparentBg?"transparent":bgColor},
+          dotsOptions:{color:fgColor, type:dotStyle},
+          cornersSquareOptions:{color:fgColor, type:eye.outer},
+          cornersDotOptions:{color:fgColor, type:eye.inner},
+          ...(logoUrl?{image:logoUrl, imageOptions:{crossOrigin:"anonymous",margin:4,imageSize:logoSize,hideBackgroundDots:true}}:{}),
         };
-      }, [getQRData, fgColor, bgColor, transparentBg, dotStyle, eyeStyle, ecLevel, logoUrl, logoSize, qrSize, margin]);
+      },[getQRData,fgColor,bgColor,transparentBg,dotStyle,eyeStyle,ecLevel,logoUrl,logoSize,qrSize,margin]);
 
-      // Init / update QR
-      useEffect(() => {
-        if (!libLoaded || !canvasRef.current) return;
-        const opts = buildOptions();
-        if (!qrRef.current) {
-          qrRef.current = new window.QRCodeStyling(opts);
+      useEffect(()=>{
+        if(!libLoaded||!canvasRef.current)return;
+        const opts=buildOptions();
+        if(!qrRef.current){
+          qrRef.current=new window.QRCodeStyling(opts);
           qrRef.current.append(canvasRef.current);
           setQrReady(true);
-        } else {
-          qrRef.current.update(opts);
-        }
-      }, [libLoaded, buildOptions]);
+        } else { qrRef.current.update(opts); }
+      },[libLoaded,buildOptions]);
 
-      function showNotification(msg) {
+      function showNotification(msg){
         setNotification(msg);
-        setTimeout(() => setNotification(null), 3000);
+        setTimeout(()=>setNotification(null),3500);
       }
 
-      async function handleDownload(fmt) {
-        if (!qrRef.current) return;
+      async function handleDownload(fmt){
+        if(!qrRef.current)return;
         setDownloading(fmt);
-        try {
-          await qrRef.current.download({ name:"qrkey", extension: fmt });
-          showNotification(`Downloaded as ${fmt.toUpperCase()}`);
-        } catch(e) { showNotification("Download failed"); }
-        setTimeout(() => setDownloading(null), 1000);
+        try{
+          await qrRef.current.download({name:"qrkey",extension:fmt});
+          showNotification(`[OK] qrkey.${fmt} written to disk`);
+        }catch(e){ showNotification("[ERR] download failed"); }
+        setTimeout(()=>setDownloading(null),1000);
       }
 
-      function handleLogoUpload(e) {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = ev => setLogoUrl(ev.target.result);
-        reader.readAsDataURL(file);
+      function handleLogoUpload(e){
+        const file=e.target.files?.[0];
+        if(!file)return;
+        const r=new FileReader();
+        r.onload=ev=>setLogoUrl(ev.target.result);
+        r.readAsDataURL(file);
       }
 
-      function removeLogo() {
+      function removeLogo(){
         setLogoUrl(null);
-        if (logoInputRef.current) logoInputRef.current.value = "";
-        if (ecLevel === "H") setEcLevel("M");
+        if(logoInputRef.current)logoInputRef.current.value="";
+        if(ecLevel==="H")setEcLevel("M");
+        showNotification("[OK] logo detached");
       }
 
       const inputData = getQRData();
+      const dataLen   = inputData.length;
 
+      // ── Title Screen ──────────────────────────────────────
+      if (screen === "title") {
+        return (
+          <div className={`boot-screen ${screenLeaving ? "boot-fade-out" : "boot-fade-in"}`}>
+            <div className="boot-inner">
+              <img src={`data:image/png;base64,${LOGO_B64}`} alt="Playology" className="boot-logo" />
+              <div className="boot-wordmark typing">
+                QRKEY<span className="caret blink">_</span>
+              </div>
+              <div className="boot-sub">// TERMINAL v1.0.0 &nbsp;·&nbsp; PLAYOLOGY</div>
+              <div className="boot-progress-wrap">
+                <div className="boot-progress-label">
+                  <span>BOOT</span><span>SYSTEM INIT</span>
+                </div>
+                <div className="boot-progress-track">
+                  <div className="boot-progress-fill" />
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // ── Intro Screen ──────────────────────────────────────
+      if (screen === "intro") {
+        return (
+          <div className={`boot-screen ${screenLeaving ? "boot-fade-out" : "boot-fade-in"}`}>
+            <div className="boot-inner">
+              <img src={`data:image/png;base64,${LOGO_B64}`} alt="Playology" className="boot-logo" style={{animationDelay:"0s",marginBottom:18}} />
+              <div className="boot-intro-prompt">&gt; SYSTEM READY_</div>
+              <div className="boot-line l1"><span className="arrow">&gt;</span>QRKey generates quirky QR codes for URLs, WiFi, Contacts, and Text.</div>
+              <div className="boot-line l2"><span className="arrow">&gt;</span>Style them with custom colors, patterns, and logos.</div>
+              <div className="boot-line l3"><span className="arrow">&gt;</span>Everything runs locally.</div>
+              <button className="boot-btn" onClick={startApp}>&gt; RUN ./qrkey</button>
+            </div>
+          </div>
+        );
+      }
+
+      // ── Render ────────────────────────────────────────────
       return (
-        <div style={{ fontFamily:"'DM Mono','Courier New',monospace", minHeight:"100vh", background:"#0c0c0c", color:"#e8e4dc", overflowX:"hidden" }}>
+        <div style={{fontFamily:"var(--font)",minHeight:"100vh",background:"var(--bg)",color:"var(--primary)",display:"flex",flexDirection:"column"}}>
 
           {/* Notification */}
           {notification && (
-            <div className="notification-anim" style={{ position:"fixed", top:16, left:"50%", transform:"translateX(-50%)", zIndex:999, background:"#d4a853", color:"#0c0c0c", padding:"8px 20px", borderRadius:999, fontSize:12, fontWeight:500, boxShadow:"0 8px 32px rgba(0,0,0,0.5)", whiteSpace:"nowrap" }}>
+            <div className="ntf" style={{position:"fixed",left:"50%",transform:"translateX(-50%)",zIndex:1000,background:"var(--bg)",border:"1px solid var(--primary)",color:"var(--primary)",padding:"7px 20px",fontSize:12,textShadow:"var(--glow)",letterSpacing:"0.08em",whiteSpace:"nowrap",boxShadow:"var(--glow-md)"}}>
               {notification}
             </div>
           )}
 
           {/* Header */}
-          <header className="fade-in" style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"20px 32px", borderBottom:"1px solid #1a1a1a" }}>
-            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-              <img src="data:image/png;base64,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" alt="Playology" style={{ width:44, height:44, objectFit:"contain" }} />
-              <div style={{ display:"flex", alignItems:"baseline", gap:8 }}>
-                <span style={{ fontFamily:"'Playfair Display',serif", fontWeight:700, fontSize:18, letterSpacing:"-0.02em" }}>QRKey</span>
-                <span style={{ fontSize:10, color:"#444", letterSpacing:"0.2em", textTransform:"uppercase" }}>Studio</span>
+          <div style={{borderBottom:"1px solid var(--border)",padding:"10px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(51,255,0,0.03)"}}>
+            <div style={{display:"flex",alignItems:"center",gap:14}}>
+              <img src={`data:image/png;base64,${LOGO_B64}`} alt="Playology" style={{width:38,height:38,objectFit:"contain",opacity:0.92}} />
+              <div>
+                <div style={{fontSize:16,fontWeight:700,textTransform:"uppercase",letterSpacing:"0.15em",textShadow:"var(--glow-md)"}}>
+                  QRKey<span className="blink" style={{color:"var(--primary)",marginLeft:2}}>_</span>
+                </div>
+                <div style={{fontSize:10,color:"var(--muted)",letterSpacing:"0.2em"}}>// TERMINAL v1.0.0</div>
               </div>
             </div>
-            <div style={{ display:"flex", alignItems:"center", gap:8, fontSize:11, color:"#333" }}>
-              <span style={{ width:8, height:8, borderRadius:"50%", background:"#2a7a4b", display:"inline-block" }}></span>
-              client-side · private
+            <div style={{fontSize:11,color:"var(--muted)",letterSpacing:"0.12em",textAlign:"right"}}>
+              <div><span style={{color:"var(--primary)",textShadow:"var(--glow)"}}>●</span> PROC:LOCAL &nbsp; MEM:PRIVATE</div>
+              <div>SYS:{new Date().toISOString().slice(0,10)}</div>
             </div>
-          </header>
+          </div>
 
           {/* Body */}
-          <div style={{ display:"flex", flexWrap:"wrap", minHeight:"calc(100vh - 65px)" }}>
+          <div style={{display:"flex",flex:1,flexWrap:"wrap",overflow:"hidden"}}>
 
-            {/* ── LEFT PANEL ── */}
-            <div className="left-panel" style={{ width:400, minWidth:340, borderRight:"1px solid #1a1a1a", overflowY:"auto", maxHeight:"calc(100vh - 65px)", flexShrink:0 }}>
+            {/* ── LEFT: Controls ── */}
+            <div style={{width:380,minWidth:320,borderRight:"1px solid var(--border)",overflowY:"auto",maxHeight:"calc(100vh - 57px)",flexShrink:0}}>
 
               {/* Input type tabs */}
-              <div className="control-section" style={{ padding:24 }}>
-                <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:12 }}>Input Type</div>
-                <div style={{ display:"flex", gap:4, padding:4, background:"#111", borderRadius:10 }}>
-                  {INPUT_TYPES.map(tab => (
-                    <button key={tab} onClick={() => setActiveTab(tab)}
-                      className={`tab-pill ${activeTab===tab?"active":""}`}
-                      style={{ flex:1, padding:"8px 4px", borderRadius:7, fontSize:12, fontWeight:500, color: activeTab===tab?"#0c0c0c":"#555", fontFamily:"inherit" }}>
-                      {tab}
+              <div style={{borderBottom:"1px solid var(--border)"}}>
+                <div className="pane-header"><span style={{color:"var(--muted)"}}>//</span> INPUT_TYPE</div>
+                <div className="tab-row">
+                  {INPUT_TYPES.map(t=>(
+                    <button key={t} className={`tab-btn ${activeTab===t?"active":""}`} onClick={()=>setActiveTab(t)}>
+                      {t}
                     </button>
                   ))}
                 </div>
               </div>
 
               {/* Input fields */}
-              <div className="control-section" style={{ padding:24 }}>
-                {activeTab === "URL" && (
+              <div className="ctrl-section">
+                <div style={{marginBottom:8,fontSize:11,color:"var(--muted)"}}>
+                  <span className="prompt">user@qrkey:~$</span> input --type={activeTab.toLowerCase()}
+                </div>
+                {activeTab==="URL" && (
                   <div>
-                    <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:8 }}>URL</div>
-                    <input className="input-field" placeholder="https://example.com" value={urlValue} onChange={e=>setUrlValue(e.target.value)} />
+                    <div className="term-label" style={{marginBottom:4}}>&gt; target_url</div>
+                    <input className="term-input" placeholder="https://example.com" value={urlValue} onChange={e=>setUrlValue(e.target.value)} />
                   </div>
                 )}
-                {activeTab === "Text" && (
+                {activeTab==="Text" && (
                   <div>
-                    <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:8 }}>Plain Text</div>
-                    <textarea className="input-field" rows={3} placeholder="Enter any text…" value={textValue} onChange={e=>setTextValue(e.target.value)} style={{ resize:"none", lineHeight:1.6 }} />
+                    <div className="term-label" style={{marginBottom:4}}>&gt; payload</div>
+                    <textarea className="term-input" rows={3} placeholder="enter payload..." value={textValue} onChange={e=>setTextValue(e.target.value)} />
                   </div>
                 )}
-                {activeTab === "WiFi" && (
-                  <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
+                {activeTab==="WiFi" && (
+                  <div style={{display:"flex",flexDirection:"column",gap:12}}>
                     <div>
-                      <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:6 }}>Network Name (SSID)</div>
-                      <input className="input-field" placeholder="MyNetwork" value={wifiData.ssid} onChange={e=>setWifiData(p=>({...p,ssid:e.target.value}))} />
+                      <div className="term-label" style={{marginBottom:4}}>&gt; ssid</div>
+                      <input className="term-input" placeholder="MyNetwork" value={wifiData.ssid} onChange={e=>setWifiData(p=>({...p,ssid:e.target.value}))} />
                     </div>
                     <div>
-                      <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:6 }}>Password</div>
-                      <input className="input-field" type="password" placeholder="••••••••" value={wifiData.password} onChange={e=>setWifiData(p=>({...p,password:e.target.value}))} />
+                      <div className="term-label" style={{marginBottom:4}}>&gt; psk</div>
+                      <input className="term-input" type="password" placeholder="••••••••" value={wifiData.password} onChange={e=>setWifiData(p=>({...p,password:e.target.value}))} />
                     </div>
-                    <div style={{ display:"flex", gap:8 }}>
-                      {["WPA","WEP","nopass"].map(s => (
-                        <button key={s} onClick={()=>setWifiData(p=>({...p,security:s}))}
-                          style={{ flex:1, padding:"8px 0", borderRadius:8, fontSize:12, cursor:"pointer", fontFamily:"inherit", background:"transparent", border:`1px solid ${wifiData.security===s?"#d4a853":"#222"}`, color:wifiData.security===s?"#d4a853":"#555", transition:"all 0.15s" }}>
+                    <div style={{display:"flex",gap:6}}>
+                      {["WPA","WEP","nopass"].map(s=>(
+                        <button key={s} className={`term-btn ${wifiData.security===s?"active":""}`} style={{flex:1}}
+                          onClick={()=>setWifiData(p=>({...p,security:s}))}>
                           {s}
                         </button>
                       ))}
                     </div>
-                    <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                      <span style={{ fontSize:12, color:"#555" }}>Hidden Network</span>
-                      <div className={`toggle-switch ${wifiData.hidden?"on":""}`} onClick={()=>setWifiData(p=>({...p,hidden:!p.hidden}))} />
+                    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                      <span style={{fontSize:11,color:"var(--muted)"}}>--hidden-ssid</span>
+                      <div className={`term-toggle ${wifiData.hidden?"on":""}`} onClick={()=>setWifiData(p=>({...p,hidden:!p.hidden}))} />
                     </div>
                   </div>
                 )}
-                {activeTab === "vCard" && (
-                  <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                    {[{key:"name",label:"Full Name",ph:"Jane Smith"},{key:"phone",label:"Phone",ph:"+1 555 000 0000"},{key:"email",label:"Email",ph:"jane@example.com"},{key:"org",label:"Organization",ph:"Acme Corp"},{key:"url",label:"Website",ph:"https://example.com"}].map(({key,label,ph})=>(
-                      <div key={key}>
-                        <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:6 }}>{label}</div>
-                        <input className="input-field" placeholder={ph} value={vcardData[key]} onChange={e=>setVcardData(p=>({...p,[key]:e.target.value}))} />
+                {activeTab==="vCard" && (
+                  <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                    {[{k:"name",l:"fn (full_name)"},{k:"phone",l:"tel"},{k:"email",l:"email"},{k:"org",l:"org"},{k:"url",l:"url"}].map(({k,l})=>(
+                      <div key={k}>
+                        <div className="term-label" style={{marginBottom:3}}>&gt; {l}</div>
+                        <input className="term-input" placeholder={l} value={vcardData[k]} onChange={e=>setVcardData(p=>({...p,[k]:e.target.value}))} />
                       </div>
                     ))}
                   </div>
                 )}
+                {/* Payload size meter */}
+                <div style={{marginTop:12,display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:10,color:"var(--muted)"}}>PAYLOAD</span>
+                  <TermBar value={Math.min(dataLen,300)} max={300} width={18} />
+                  <span style={{fontSize:10,color:"var(--muted)"}}>{dataLen}B</span>
+                </div>
               </div>
 
               {/* Colors */}
-              <div className="control-section" style={{ padding:24 }}>
-                <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:16 }}>Colors</div>
-                <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                  {/* Foreground */}
-                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                    <span style={{ fontSize:12, color:"#888" }}>Foreground</span>
-                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                      <span style={{ fontSize:11, color:"#444", fontFamily:"monospace" }}>{fgColor}</span>
-                      <div style={{ width:36, height:36, borderRadius:8, border:"1px solid #2a2a2a", overflow:"hidden" }}>
-                        <input type="color" value={fgColor} onChange={e=>setFgColor(e.target.value)} />
-                      </div>
-                    </div>
+              <div className="ctrl-section">
+                <div className="pane-header" style={{padding:"0 0 8px 0",border:"none"}}><span style={{color:"var(--muted)"}}>//</span> COLOR_CONFIG</div>
+                <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <span style={{fontSize:11,color:"var(--muted)"}}>--fg <span style={{color:"var(--primary)"}}>{fgColor}</span></span>
+                    <input type="color" value={fgColor} onChange={e=>setFgColor(e.target.value)} />
                   </div>
-                  {/* Background */}
-                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                    <span style={{ fontSize:12, color:"#888" }}>Background</span>
-                    <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                      <span style={{ fontSize:11, color:"#444", fontFamily:"monospace" }}>{transparentBg?"transparent":bgColor}</span>
-                      {!transparentBg && (
-                        <div style={{ width:36, height:36, borderRadius:8, border:"1px solid #2a2a2a", overflow:"hidden" }}>
-                          <input type="color" value={bgColor} onChange={e=>setBgColor(e.target.value)} />
-                        </div>
-                      )}
-                    </div>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <span style={{fontSize:11,color:"var(--muted)"}}>--bg <span style={{color:"var(--primary)"}}>{transparentBg?"transparent":bgColor}</span></span>
+                    {!transparentBg && <input type="color" value={bgColor} onChange={e=>setBgColor(e.target.value)} />}
                   </div>
-                  {/* Transparent toggle */}
-                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
-                    <span style={{ fontSize:12, color:"#888" }}>Transparent Background</span>
-                    <div className={`toggle-switch ${transparentBg?"on":""}`} onClick={()=>setTransparentBg(p=>!p)} />
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+                    <span style={{fontSize:11,color:"var(--muted)"}}>--transparent-bg</span>
+                    <div className={`term-toggle ${transparentBg?"on":""}`} onClick={()=>setTransparentBg(p=>!p)} />
                   </div>
-                  {/* Contrast feedback */}
-                  {!transparentBg && !contrastOk && (
-                    <div className="contrast-warn">
-                      <span style={{ color:"#f5a623" }}>⚠</span>
-                      <span style={{ fontSize:11, color:"#f5a623" }}>Low contrast ({contrastVal}:1) — may not scan reliably</span>
+                  {/* Contrast meter */}
+                  {!transparentBg && (
+                    <div style={{fontSize:10,letterSpacing:"0.05em"}}>
+                      <span style={{color:contrastOk?"var(--primary)":"var(--error)",textShadow:contrastOk?"var(--glow)":"0 0 6px rgba(255,51,51,0.6)"}}>
+                        {contrastOk?"[OK] ":"[WARN]"} CONTRAST_RATIO: {contrastVal}:1
+                      </span>
+                      &nbsp;
+                      <TermBar value={Math.min(parseFloat(contrastVal),21)} max={21} width={12} />
                     </div>
-                  )}
-                  {!transparentBg && contrastOk && (
-                    <span className="contrast-ok">✓ Contrast {contrastVal}:1 — scannable</span>
                   )}
                 </div>
               </div>
 
-              {/* Dot Style */}
-              <div className="control-section" style={{ padding:24 }}>
-                <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:14 }}>Dot Pattern</div>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8 }}>
-                  {DOT_STYLES.map(style => (
-                    <button key={style} onClick={()=>setDotStyle(style)}
-                      className={`dot-btn ${dotStyle===style?"active":""}`}
-                      style={{ padding:"8px 4px", borderRadius:8, fontSize:11, cursor:"pointer", fontFamily:"inherit", background: dotStyle===style?"rgba(212,168,83,0.06)":"transparent", border:`1px solid ${dotStyle===style?"#d4a853":"#1e1e1e"}`, color: dotStyle===style?"#d4a853":"#555" }}>
-                      {style.replace("-"," ")}
+              {/* Dot style */}
+              <div className="ctrl-section">
+                <div className="pane-header" style={{padding:"0 0 8px 0",border:"none"}}><span style={{color:"var(--muted)"}}>//</span> DOT_PATTERN</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:5}}>
+                  {DOT_STYLES.map(s=>(
+                    <button key={s} className={`term-btn ${dotStyle===s?"active":""}`} style={{fontSize:10,padding:"5px 2px"}} onClick={()=>setDotStyle(s)}>
+                      {s.replace("-"," ")}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Eye Style */}
-              <div className="control-section" style={{ padding:24 }}>
-                <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:14 }}>Corner Eyes</div>
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8 }}>
-                  {EYE_STYLES.map(style => (
-                    <button key={style} onClick={()=>setEyeStyle(style)}
-                      className={`dot-btn ${eyeStyle===style?"active":""}`}
-                      style={{ padding:"8px 4px", borderRadius:8, fontSize:11, cursor:"pointer", fontFamily:"inherit", background: eyeStyle===style?"rgba(212,168,83,0.06)":"transparent", border:`1px solid ${eyeStyle===style?"#d4a853":"#1e1e1e"}`, color: eyeStyle===style?"#d4a853":"#555" }}>
-                      {style==="extra-rounded"?"rounded":style}
+              {/* Eye style */}
+              <div className="ctrl-section">
+                <div className="pane-header" style={{padding:"0 0 8px 0",border:"none"}}><span style={{color:"var(--muted)"}}>//</span> CORNER_EYE</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:5}}>
+                  {EYE_STYLES.map(s=>(
+                    <button key={s} className={`term-btn ${eyeStyle===s?"active":""}`} style={{fontSize:10,padding:"5px 2px"}} onClick={()=>setEyeStyle(s)}>
+                      {s==="extra-rounded"?"rounded":s}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Error Correction */}
-              <div className="control-section" style={{ padding:24 }}>
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
-                  <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555" }}>Error Correction</div>
-                  <div style={{ fontSize:10, color:"#333" }}>{ecLevel==="L"?"7%":ecLevel==="M"?"15%":ecLevel==="Q"?"25%":"30%"} recovery</div>
-                </div>
-                <div style={{ display:"flex", gap:4 }}>
-                  {EC_LEVELS.map(level => (
-                    <button key={level} onClick={()=>setEcLevel(level)}
-                      style={{ flex:1, padding:"8px 0", borderRadius:8, fontSize:12, fontFamily:"'DM Mono',monospace", cursor:"pointer", background: ecLevel===level?"rgba(212,168,83,0.06)":"transparent", border:`1px solid ${ecLevel===level?"#d4a853":"#1e1e1e"}`, color: ecLevel===level?"#d4a853":"#555" }}>
-                      {level}
+              {/* EC Level */}
+              <div className="ctrl-section">
+                <div className="pane-header" style={{padding:"0 0 8px 0",border:"none"}}><span style={{color:"var(--muted)"}}>//</span> ERROR_CORRECTION</div>
+                <div style={{display:"flex",gap:5}}>
+                  {EC_LEVELS.map(l=>(
+                    <button key={l} className={`term-btn ${ecLevel===l?"active":""}`} style={{flex:1,fontSize:11}} onClick={()=>setEcLevel(l)}>
+                      -{l} <span style={{fontSize:9,opacity:0.7}}>{EC_INFO[l]}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
               {/* Logo */}
-              <div className="control-section" style={{ padding:24 }}>
-                <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555", marginBottom:14 }}>Logo / Watermark</div>
-                {!logoUrl ? (
-                  <div className={`logo-drop-zone ${logoHover?"hover":""}`}
+              <div className="ctrl-section">
+                <div className="pane-header" style={{padding:"0 0 8px 0",border:"none"}}><span style={{color:"var(--muted)"}}>//</span> LOGO_EMBED</div>
+                {!logoUrl?(
+                  <div className={`drop-zone ${logoHover?"hover":""}`}
                     onClick={()=>logoInputRef.current?.click()}
                     onDragOver={e=>{e.preventDefault();setLogoHover(true);}}
                     onDragLeave={()=>setLogoHover(false)}
                     onDrop={e=>{e.preventDefault();setLogoHover(false);const f=e.dataTransfer.files?.[0];if(f){const r=new FileReader();r.onload=ev=>setLogoUrl(ev.target.result);r.readAsDataURL(f);}}}>
-                    <div style={{ fontSize:24, opacity:0.3, marginBottom:8 }}>⊕</div>
-                    <div style={{ fontSize:12, color:"#444" }}>Drop image or click to upload</div>
-                    <div style={{ fontSize:10, color:"#333", marginTop:4 }}>PNG, SVG, JPG</div>
+                    <div style={{fontSize:11,color:"var(--muted)",letterSpacing:"0.08em"}}>
+                      <div style={{marginBottom:4}}>&gt; attach --image &lt;file&gt;</div>
+                      <div style={{fontSize:10,color:"var(--border)"}}>PNG / SVG / JPG accepted</div>
+                    </div>
                   </div>
-                ) : (
-                  <div style={{ display:"flex", flexDirection:"column", gap:12 }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:12, background:"#111", borderRadius:12, padding:12 }}>
-                      <img src={logoUrl} alt="logo" style={{ width:40, height:40, borderRadius:8, objectFit:"contain", background:"white", padding:4 }} />
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:12, color:"#888" }}>Logo uploaded</div>
-                        <div style={{ fontSize:10, color:"#444" }}>EC upgraded to H</div>
+                ):(
+                  <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                    <div style={{display:"flex",alignItems:"center",gap:10,border:"1px solid var(--muted)",padding:8}}>
+                      <img src={logoUrl} alt="logo" style={{width:32,height:32,objectFit:"contain",border:"1px solid var(--muted)"}} />
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:11,color:"var(--primary)",textShadow:"var(--glow)"}}>logo.attached</div>
+                        <div style={{fontSize:10,color:"var(--muted)"}}>ec --level=H enforced</div>
                       </div>
-                      <button onClick={removeLogo} style={{ background:"transparent", border:"none", cursor:"pointer", color:"#444", fontSize:20, lineHeight:1, transition:"color 0.15s" }}
-                        onMouseEnter={e=>e.target.style.color="#d4a853"} onMouseLeave={e=>e.target.style.color="#444"}>×</button>
+                      <button className="term-btn" style={{padding:"3px 8px"}} onClick={removeLogo}>rm</button>
                     </div>
                     <div>
-                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:8 }}>
-                        <span style={{ fontSize:12, color:"#555" }}>Size</span>
-                        <span style={{ fontSize:11, fontFamily:"monospace", color:"#444" }}>{Math.round(logoSize*100)}%</span>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                        <span style={{fontSize:10,color:"var(--muted)"}}>--size</span>
+                        <span style={{fontSize:10,color:"var(--primary)"}}>{Math.round(logoSize*100)}%</span>
                       </div>
                       <input type="range" min="10" max="40" value={logoSize*100} onChange={e=>setLogoSize(parseInt(e.target.value)/100)} />
                     </div>
                   </div>
                 )}
-                <input ref={logoInputRef} type="file" accept="image/*" style={{ display:"none" }} onChange={handleLogoUpload} />
+                <input ref={logoInputRef} type="file" accept="image/*" style={{display:"none"}} onChange={handleLogoUpload} />
               </div>
 
               {/* Margin */}
-              <div style={{ padding:24 }}>
-                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:12 }}>
-                  <div style={{ fontSize:10, textTransform:"uppercase", letterSpacing:"0.2em", color:"#555" }}>Quiet Zone Margin</div>
-                  <span style={{ fontSize:11, fontFamily:"monospace", color:"#444" }}>{margin}px</span>
+              <div style={{padding:16}}>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                  <span style={{fontSize:10,color:"var(--muted)"}}>--quiet-zone</span>
+                  <span style={{fontSize:10,color:"var(--primary)"}}>{margin}px</span>
                 </div>
                 <input type="range" min="0" max="10" value={margin} onChange={e=>setMargin(parseInt(e.target.value))} />
               </div>
             </div>
 
-            {/* ── RIGHT PANEL ── */}
-            <div className="right-panel" style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:48, gap:32, minWidth:340 }}>
+            {/* ── RIGHT: Preview + Export ── */}
+            <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:40,gap:28,minWidth:320}}>
 
-              {/* QR Preview */}
-              <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:24 }}>
-                <div style={{ position:"relative" }}>
-                  {/* Ambient glow */}
-                  <div style={{ position:"absolute", inset:0, borderRadius:20, filter:"blur(40px)", opacity:0.15, transform:"scale(1.1)", background:fgColor, pointerEvents:"none" }} />
-                  {/* Canvas wrapper */}
-                  <div style={{
-                    position:"relative", borderRadius:20, overflow:"hidden",
-                    boxShadow:"0 24px 80px rgba(0,0,0,0.6)",
-                    background: transparentBg ? "repeating-conic-gradient(#1a1a1a 0% 25%, #111 0% 50%) 0 0 / 16px 16px" : bgColor,
-                    padding:12, border:"1px solid #1e1e1e"
-                  }}>
-                    {!libLoaded && (
-                      <div className="qr-loading" style={{ width:qrSize, height:qrSize, display:"flex", alignItems:"center", justifyContent:"center" }}>
-                        <span style={{ fontSize:11, color:"#333", letterSpacing:"0.2em" }}>LOADING ENGINE</span>
-                      </div>
-                    )}
-                    <div ref={canvasRef} style={{ display: libLoaded ? "block" : "none" }} />
-                  </div>
+              {/* Pane title */}
+              <div style={{width:"100%",maxWidth:360}}>
+                <div className="pane-header" style={{justifyContent:"space-between"}}>
+                  <span><span style={{color:"var(--muted)"}}>//</span> QR_PREVIEW</span>
+                  <span style={{fontSize:10,color:"var(--muted)"}}>{qrReady?"[READY]":"[INIT...]"}</span>
                 </div>
 
-                {/* Data preview pill */}
-                <div style={{ display:"flex", alignItems:"center", gap:8, background:"#111", border:"1px solid #1a1a1a", borderRadius:999, padding:"8px 16px", maxWidth:360, width:"100%" }}>
-                  <span style={{ fontSize:12, color:"#444", flexShrink:0 }}>
-                    {activeTab==="URL"?"🔗":activeTab==="WiFi"?"📶":activeTab==="vCard"?"👤":"📝"}
-                  </span>
-                  <span style={{ fontSize:11, color:"#555", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", fontFamily:"monospace" }}>
-                    {inputData.substring(0,60)}{inputData.length>60?"…":""}
-                  </span>
-                  <span style={{ fontSize:10, color:"#333", flexShrink:0, marginLeft:"auto" }}>{inputData.length}c</span>
+                {/* QR canvas */}
+                <div style={{
+                  border:"1px solid var(--border)",
+                  borderTop:"none",
+                  display:"flex",
+                  alignItems:"center",
+                  justifyContent:"center",
+                  padding:14,
+                  background: transparentBg
+                    ? "repeating-conic-gradient(#111 0% 25%, #0a0a0a 0% 50%) 0 0 / 14px 14px"
+                    : bgColor,
+                  position:"relative"
+                }}>
+                  {/* Corner accents */}
+                  <span style={{position:"absolute",top:4,left:4,fontSize:10,color:"var(--muted)",lineHeight:1}}>┌</span>
+                  <span style={{position:"absolute",top:4,right:4,fontSize:10,color:"var(--muted)",lineHeight:1}}>┐</span>
+                  <span style={{position:"absolute",bottom:4,left:4,fontSize:10,color:"var(--muted)",lineHeight:1}}>└</span>
+                  <span style={{position:"absolute",bottom:4,right:4,fontSize:10,color:"var(--muted)",lineHeight:1}}>┘</span>
+
+                  {!libLoaded && (
+                    <div style={{width:qrSize,height:qrSize,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:8}}>
+                      <span style={{fontSize:11,color:"var(--muted)",letterSpacing:"0.2em"}}>LOADING ENGINE...</span>
+                      <span style={{fontSize:10,color:"var(--border)"}}>initializing qr-code-styling</span>
+                    </div>
+                  )}
+                  <div ref={canvasRef} className="qr-wrap" style={{display:libLoaded?"block":"none"}} />
+                </div>
+
+                {/* Data readout */}
+                <div style={{border:"1px solid var(--border)",borderTop:"none",padding:"6px 10px",background:"rgba(51,255,0,0.02)"}}>
+                  <div style={{fontSize:10,color:"var(--muted)",display:"flex",gap:6,alignItems:"center"}}>
+                    <span className="prompt">$</span>
+                    <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",flex:1,color:"var(--primary)",textShadow:"var(--glow)"}}>
+                      {inputData.substring(0,55)}{inputData.length>55?"…":""}
+                    </span>
+                    <span style={{flexShrink:0,color:"var(--border)"}}>{dataLen}B</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Download buttons */}
-              <div style={{ display:"flex", gap:12, width:"100%", maxWidth:360 }}>
-                {["png","svg"].map(fmt => (
-                  <button key={fmt} onClick={()=>handleDownload(fmt)} disabled={!qrReady || !!downloading}
-                    className="download-btn"
-                    style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:8, padding:"12px 24px", borderRadius:12, border:"1px solid #2a2a2a", fontSize:13, color:"#888", fontFamily:"inherit" }}>
-                    {downloading===fmt ? (
-                      <span style={{ fontSize:10, letterSpacing:"0.2em" }}>SAVING…</span>
-                    ) : (
-                      <>
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
-                          <path d="M7 1v8M4 6l3 3 3-3M1 10v1a2 2 0 002 2h8a2 2 0 002-2v-1"/>
-                        </svg>
-                        Download {fmt.toUpperCase()}
-                      </>
-                    )}
-                  </button>
-                ))}
+              {/* Download */}
+              <div style={{width:"100%",maxWidth:360}}>
+                <div className="pane-header"><span style={{color:"var(--muted)"}}>//</span> EXPORT</div>
+                <div style={{display:"flex",border:"1px solid var(--border)",borderTop:"none"}}>
+                  {["png","svg"].map(fmt=>(
+                    <button key={fmt} className="dl-btn" disabled={!qrReady||!!downloading}
+                      onClick={()=>handleDownload(fmt)}
+                      style={{borderRight:fmt==="png"?"1px solid var(--border)":"none"}}>
+                      <span>{downloading===fmt?"writing...":"> qrkey."+fmt}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Info tiles */}
-              <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:12, width:"100%", maxWidth:360 }}>
-                {[{icon:"⬡",label:"Client-side",sub:"100% private"},{icon:"◈",label:"Vector SVG",sub:"Infinite scale"},{icon:"◉",label:"EC Level H",sub:"30% recovery"}].map(({icon,label,sub})=>(
-                  <div key={label} style={{ background:"#0e0e0e", border:"1px solid #151515", borderRadius:12, padding:12, textAlign:"center" }}>
-                    <div style={{ fontSize:18, opacity:0.3, marginBottom:4 }}>{icon}</div>
-                    <div style={{ fontSize:10, color:"#666" }}>{label}</div>
-                    <div style={{ fontSize:9, color:"#333", marginTop:2 }}>{sub}</div>
-                  </div>
-                ))}
+              {/* Status panel */}
+              <div style={{width:"100%",maxWidth:360,border:"1px solid var(--border)"}}>
+                <div className="pane-header"><span style={{color:"var(--muted)"}}>//</span> SYSTEM_STATUS</div>
+                <div style={{padding:"10px 14px",display:"flex",flexDirection:"column",gap:6}}>
+                  {[
+                    ["RENDER",    "CLIENT_SIDE",     true],
+                    ["PRIVACY",   "NO_SERVER_CALLS", true],
+                    ["EC_LEVEL",  ecLevel+` (${EC_INFO[ecLevel]} recovery)`, true],
+                    ["CONTRAST",  contrastVal+":1",  contrastOk],
+                    ["FORMAT",    "PNG + SVG",        true],
+                  ].map(([key,val,ok])=>(
+                    <div key={key} style={{display:"flex",justifyContent:"space-between",fontSize:11}}>
+                      <span style={{color:"var(--muted)"}}>{key}</span>
+                      <span style={{color:ok?"var(--primary)":"var(--error)",textShadow:ok?"var(--glow)":"0 0 6px rgba(255,51,51,0.5)"}}>
+                        {ok?"[OK] ":"[WARN]"}{val}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Command line easter egg */}
+              <div style={{width:"100%",maxWidth:360,fontSize:11,color:"var(--muted)"}}>
+                <span className="prompt">user@qrkey:~$</span>{" "}
+                <span style={{color:"var(--primary)",textShadow:"var(--glow)"}}>{cmdLine || "qrkey --generate"}</span>
+                <span className="blink" style={{color:"var(--primary)"}}>█</span>
               </div>
             </div>
           </div>
@@ -630,9 +1022,7 @@
       );
     }
 
-    // Mount
-    const root = ReactDOM.createRoot(document.getElementById("root"));
-    root.render(<QRKey />);
+    ReactDOM.createRoot(document.getElementById("root")).render(<QRKey />);
   </script>
 </body>
 </html>
